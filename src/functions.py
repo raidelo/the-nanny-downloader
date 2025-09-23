@@ -1,12 +1,11 @@
 import json
 from base64 import b64decode
 from pathlib import Path
-from urllib.parse import unquote_plus
 
 from requests import get
 from bs4 import BeautifulSoup
 
-from constants import CHAPTER_MATCH, TRID_MAPPING_PATH, DEFAULT_USER_AGENT, TEMPLATE_URL
+from constants import TRID_MAPPING_PATH, DEFAULT_USER_AGENT, TEMPLATE_URL
 from errors import InvalidDeliveryMethod, InvalidChapter
 
 
@@ -56,17 +55,6 @@ def get_final_url(first_url: str, delivery_method: str) -> str | None:
         return get_final_url_from_mediafire(delivery_content)
     else:
         raise NotImplementedError
-
-
-def get_path_for_chapter(url: str, chapter) -> Path:
-    filename = unquote_plus(Path(url.split("?")[0]).name)
-
-    m = CHAPTER_MATCH.match(chapter)
-
-    if not m:
-        raise InvalidChapter(chapter)
-
-    return Path().joinpath("Season %s" % m.group(1)).joinpath(filename)
 
 
 def download_archive(url, path: Path | None = None, resume: bool = True):
