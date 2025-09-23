@@ -1,11 +1,12 @@
 import json
 from base64 import b64decode
-from subprocess import Popen
+from pathlib import Path
+from urllib.parse import unquote_plus
 
 from requests import get
 from bs4 import BeautifulSoup
 
-from constants import TRID_MAPPING_PATH, DEFAULT_USER_AGENT
+from constants import CHAPTER_MATCH, TRID_MAPPING_PATH, DEFAULT_USER_AGENT, TEMPLATE_URL
 from errors import InvalidDeliveryMethod, InvalidChapter
 
 
@@ -57,23 +58,49 @@ def get_final_url(first_url: str, delivery_method: str) -> str | None:
         raise NotImplementedError
 
 
-def download_from_final_url(url: str):
-    s = Popen(["wget.exe", url])
+def get_path_for_chapter(url: str, chapter) -> Path:
+    filename = unquote_plus(Path(url.split("?")[0]).name)
 
-    return s.wait()
+    m = CHAPTER_MATCH.match(chapter)
+
+    if not m:
+        raise InvalidChapter(chapter)
+
+    return Path().joinpath("Season %s" % m.group(1)).joinpath(filename)
 
 
-def download_chapter(
-    chapter: str, delivery_method: str, trid_map: dict, trdownload_map: dict
-):
-    first_url = get_first_url(chapter, delivery_method, trid_map, trdownload_map)
-    final_url = get_final_url(chapter, delivery_method)
+def download_archive(url, path: Path | None = None, resume: bool = True):
+    """
+    Descarga un archivo desde una URL con capacidad de reanudar la rescarga
+    """
 
-    if final_url:
-        print("Downloading chapter <%s> from <%s>" % (chapter, delivery_method))
-        print("DEBUG: first url: %s" % first_url)
-        print("DEBUG: final url: %s" % final_url)
+    # Si no se pasa nombre, lo toma del final de la URL
+    if path is None:
+        filename = Path(url.split("?")[0]).name or "archivo_descargado"
+        path = Path().joinpath(filename)
 
-        download_from_final_url(final_url)
-    else:
-        print("error: Couldn't download chapter %s. It's url wasn't found." % chapter)
+    headers = {}
+    written = 0
+    open_mode = "wb"
+
+    if resume and path.exists():
+        written = path.stat().st_size
+        if written != 0:
+            open_mode = "ab"
+            headers = {"Range": f"bytes={written}-"}
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(path, open_mode) as f:
+        chunk = 4096  # tamaño del bloque de descarga
+
+        with get(url, stream=True, headers=headers) as r:
+            yield r.headers
+
+            if written != 0:
+                yield written
+
+            r.raise_for_status()
+            for chunk in r.iter_content(chunk_size=chunk):
+                if chunk:
+                    yield f.write(chunk)
