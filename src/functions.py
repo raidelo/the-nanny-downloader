@@ -95,10 +95,17 @@ def download_archive(url, path: Path | None = None, resume: bool = True):
         chunk = 4096  # tamaño del bloque de descarga
 
         with get(url, stream=True, headers=headers) as r:
-            yield r.headers
+            try:
+                content_length = int(str(r.headers.get("Content-Length")))
+            except ValueError:
+                yield (0, 0)
+                return
 
-            if written != 0:
-                yield written
+            if content_length == 0:
+                yield (0, 0)
+                return
+
+            yield (written, content_length)
 
             r.raise_for_status()
             for chunk in r.iter_content(chunk_size=chunk):

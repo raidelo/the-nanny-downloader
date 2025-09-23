@@ -35,8 +35,10 @@ def main():
             exit(1)
 
     console = Console()
-    console.print("\n[b][cyan]📘 The Nanny Downloader[/cyan][/b]\n")
-    console.print("\n[bold green]Iniciando descarga...[/bold green]\n")
+    console.print("\n[bold cyan]  The Nanny Downloader[/]")
+    console.print(
+        f"\n[bold green]Capítulos a descargar: [white]{', '.join(args.chapters)}[/]\n"
+    )
 
     with Progress(
         SpinnerColumn(),
@@ -49,13 +51,7 @@ def main():
             first_url = get_first_url(chapter, args.delivery, trid_map, trdownload_map)
             final_url = get_final_url(first_url, args.delivery)
 
-            if final_url:
-                console.print(
-                    "Downloading chapter <%s> from <%s>" % (chapter, args.delivery)
-                )
-                console.print("DEBUG: first url: %s" % first_url)
-                console.print("DEBUG: final url: %s" % final_url)
-            else:
+            if not final_url:
                 console.print(
                     "[red bold]error:[/] Couldn't download chapter %s. It's url wasn't found."
                     % chapter
@@ -67,17 +63,21 @@ def main():
             for pos, content_rcvd in enumerate(
                 download_archive(final_url, path_for_chapter)
             ):
-                if pos == 0 and isinstance(content_rcvd, CaseInsensitiveDict):
-                    size = content_rcvd.get("Content-Length")
-                    if not size:
+                if pos == 0 and isinstance(content_rcvd, tuple):
+                    already_saved, to_save = content_rcvd
+                    if not already_saved and not to_save:
                         console.print(
                             "[red bold]error:[/] Couldn't get enough information for chapter %s"
                             % chapter
                         )
                         break
-                    task = progress.add_task("Descargando", total=int(size))
+                    console.print(f"[bold blue]  {path_for_chapter.name}  [/bold blue]")
+                    task = progress.add_task(
+                        "Descargando", total=already_saved + to_save
+                    )
+                    progress.update(task, advance=already_saved)
                     continue
-                elif pos == 0 and not isinstance(content_rcvd, CaseInsensitiveDict):
+                elif pos == 0 and not isinstance(content_rcvd, tuple):
                     console.print(
                         "[red bold]error:[/] Couldn't get headers for chapter %s"
                         % chapter
@@ -86,11 +86,11 @@ def main():
 
                 progress.update(task, advance=content_rcvd)
 
+            progress.remove_task(task)
             console.print(
-                "\n[bold green] Capítulo %s descargado con éxito[/bold green]\n"
+                "\n[bold green] Capítulo %s descargado con éxito[/]\n"
                 % path_for_chapter.name
             )
-            progress.remove_task(task)
 
         console.print("\n[bold green]✅ Descarga finalizada con éxito[/bold green]\n")
 
