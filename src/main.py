@@ -1,4 +1,5 @@
 from pathlib import Path
+from signal import signal, SIGINT, SIGTERM
 from urllib.parse import unquote_plus
 
 from rich.console import Console
@@ -6,6 +7,7 @@ from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 
 from cli import parse_args
 from constants import CHAPTER_MATCH
+from console import console
 from errors import InvalidChapter, InvalidDeliveryMethod
 from functions import (
     download_archive,
@@ -13,6 +15,13 @@ from functions import (
     get_first_url,
     load_trid_mapping,
 )
+from signal_handler import signal_handler
+
+signal(SIGINT, signal_handler)
+signal(SIGTERM, signal_handler)
+
+SeasonID = int
+ChapterID = int
 
 
 def download_from_final_url(
@@ -66,7 +75,7 @@ def main():
         print("error: Mapping file of each chapter's url wasn't found.")
         exit(1)
 
-    chapters: list[tuple[int, int]] = []
+    chapters: list[tuple[SeasonID, ChapterID]] = []
 
     for chapter in args.chapters:
         m = CHAPTER_MATCH.match(chapter)
@@ -75,7 +84,6 @@ def main():
             exit(1)
         chapters.append((int(m.group(1)), int(m.group(2))))
 
-    console = Console()
     console.print("\n  [bold cyan]The Nanny Downloader[/]")
     console.print(
         f"\n[bold green]Capítulos a descargar: [white]{', '.join(args.chapters)}[/]\n"
