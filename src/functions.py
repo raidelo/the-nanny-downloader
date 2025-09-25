@@ -24,12 +24,16 @@ def get_final_url_from_mediafire(page: bytes) -> str | None:
     if not a_tag:
         return
 
-    scrambled_url = str(a_tag.attrs.get("data-scrambled-url"))
+    url_b64_encoded = a_tag.attrs.get("data-scrambled-url")
 
-    if not scrambled_url:
-        return
-
-    return b64decode(scrambled_url.encode()).decode()
+    if url_b64_encoded and isinstance(url_b64_encoded, str):
+        return b64decode(url_b64_encoded).decode()
+    else:
+        url = a_tag.attrs.get("href")
+        if url and isinstance(url, str):
+            return url
+        else:
+            return
 
 
 def get_first_url(

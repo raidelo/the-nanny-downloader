@@ -22,17 +22,15 @@ def start_getting_info_bar(progress: Progress, task):
 
 
 def download_from_final_url(
-    console: Console, progress: Progress, final_url: str, season: int, chapter: int
+    console: Console, progress: Progress, final_url: str, season: int
 ) -> int:
-
     filename = unquote_plus(Path(final_url.split("?")[0]).name)
 
     path = Path().joinpath("Season %d" % season).joinpath(filename)
 
     console.print(f"[bold blue]  {filename}  [/bold blue]")
 
-    task = progress.add_task(f"Getting information ...", total=0)
-    sleep(3)
+    task = progress.add_task("Getting information ...", total=0)
 
     for pos, content_rcvd in enumerate(download_archive(final_url, path)):
         if pos == 0 and isinstance(content_rcvd, tuple):
