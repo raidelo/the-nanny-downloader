@@ -1,24 +1,18 @@
 from pathlib import Path
 from urllib.parse import unquote_plus
-from time import sleep
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 
 from cli import parse_args
 from constants import CHAPTER_MATCH
+from errors import InvalidChapter, InvalidDeliveryMethod
 from functions import (
     download_archive,
     get_final_url,
     get_first_url,
     load_trid_mapping,
 )
-
-
-def start_getting_info_bar(progress: Progress, task):
-    while True:
-        progress.update(task)
-        sleep(0.2)
 
 
 def download_from_final_url(
@@ -69,7 +63,7 @@ def main():
 
     trid_map = load_trid_mapping()
     if not trid_map:
-        print("error: Mapping of each chapter's url wasn't found.")
+        print("error: Mapping file of each chapter's url wasn't found.")
         exit(1)
 
     chapters: list[tuple[int, int]] = []
@@ -82,9 +76,9 @@ def main():
         chapters.append((int(m.group(1)), int(m.group(2))))
 
     console = Console()
-    console.print("\n[bold cyan]  The Nanny Downloader[/]")
+    console.print("\n  [bold cyan]The Nanny Downloader[/]")
     console.print(
-        f"\n[bold green]Capítulos a descargar: [white]{', '.join(args.chapters)}[/]"
+        f"\n[bold green]Capítulos a descargar: [white]{', '.join(args.chapters)}[/]\n"
     )
 
     with Progress(
@@ -95,44 +89,54 @@ def main():
         console=console,
     ) as progress:
         for season, chapter in chapters:
-            first_url = get_first_url(
-                "%dx%d" % (season, chapter),
-                args.delivery,
-                trid_map,
-                trdownload_map,
-            )
+            try:
+                first_url = get_first_url(
+                    "%dx%d" % (season, chapter),
+                    args.delivery,
+                    trid_map,
+                    trdownload_map,
+                )
+            except InvalidChapter as e:
+                console.print(
+                    "[red bold]error:[/] [white]Invalid chapter [bold]%s[/white]\n"
+                    % e.chapter
+                )
+                continue
+            except InvalidDeliveryMethod as e:
+                console.print(
+                    "[red bold]error:[/] [white]Invalid delivery method [bold]%s[/white]\n"
+                    % e.delivery_method
+                )
+                continue
+
             final_url = get_final_url(first_url, args.delivery)
 
             if not final_url:
                 console.print(
-                    "[red bold]error:[/] Can't download chapter %s. It's url wasn't found."
+                    "[red bold]error:[/] [white]Can't download chapter [bold]%s[/bold]. It's url wasn't found.[/white]\n"
                     % chapter
                 )
                 continue
 
-            return_code = download_from_final_url(
-                console, progress, final_url, season, chapter
-            )
+            return_code = download_from_final_url(console, progress, final_url, season)
 
             if return_code == 0:
                 console.print(
-                    "\n[bold green]✅ Descarga finalizada con éxito[/bold green]\n"
+                    "[bold green]✅ Descarga finalizada con éxito[/bold green]\n"
                 )
                 # console.print(
-                #     "\n[bold green] Capítulo %s descargado con éxito[/]\n" % filename
+                #     "[bold green] Capítulo %s descargado con éxito[/]\n" % filename
                 # )
             elif return_code == 1:
                 console.print(
-                    "[red bold]error:[/] Couldn't get enough information for chapter %dx%d"
+                    "[red bold]error:[/] [white]Couldn't get enough information for chapter [bold]%dx%d[/]\n"
                     % (season, chapter)
                 )
             else:
                 console.print(
-                    "[red bold]error:[/] An unexpected error occurred when downloading: %dx%d"
+                    "[red bold]error:[/] [white]An unexpected error occurred when downloading: [bold]%dx%d[/]\n"
                     % (season, chapter)
                 )
-
-        # download_chapter(chapter, args.delivery, trid_map, trdownload_map)
 
 
 if __name__ == "__main__":
