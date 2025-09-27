@@ -25,11 +25,17 @@ ChapterID = int
 
 
 def download_from_final_url(
-    console: Console, progress: Progress, final_url: str, season: int
+    console: Console,
+    progress: Progress,
+    final_url: str,
+    folder: str | None,
+    season: int,
 ) -> int:
     filename = unquote_plus(Path(final_url.split("?")[0]).name)
 
-    path = Path().joinpath("Season %d" % season).joinpath(filename)
+    path = (
+        Path(folder).resolve() if folder else Path().joinpath("Season %d" % season)
+    ).joinpath(filename)
 
     console.print(f"[bold blue]  {filename}  [/bold blue]")
 
@@ -126,7 +132,9 @@ def main():
                 )
                 continue
 
-            return_code = download_from_final_url(console, progress, final_url, season)
+            return_code = download_from_final_url(
+                console, progress, final_url, args.folder, season
+            )
 
             if return_code == 0:
                 console.print(
