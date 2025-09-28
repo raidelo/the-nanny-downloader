@@ -4,6 +4,15 @@ from urllib.parse import unquote_plus
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
+from rich.progress import (
+    BarColumn,
+    DownloadColumn,
+    Progress,
+    TaskID,
+    TextColumn,
+    TimeRemainingColumn,
+    TransferSpeedColumn,
+)
 
 from cli import parse_args
 from constants import CHAPTER_MATCH
@@ -39,13 +48,16 @@ def download_from_final_url(
 
     console.print(f"[bold blue]  {filename}  [/bold blue]")
 
-    task = progress.add_task("Getting information ...", total=0)
+    task = progress.add_task(
+        "Getting information ...", start=False, total=0, filename=filename
+    )
 
     for pos, content_rcvd in enumerate(download_archive(final_url, path)):
         if pos == 0 and isinstance(content_rcvd, tuple):
             already_downloaded, to_download = content_rcvd
             if not already_downloaded and not to_download:
                 return 1
+            progress.start_task(task)
             progress.update(
                 task,
                 description="Downloading",
@@ -96,10 +108,15 @@ def main():
     )
 
     with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold blue]{task.description}"),
+        TextColumn("[bold blue]Downloading"),
         BarColumn(bar_width=None),
-        TextColumn("[green]{task.completed}/{task.total}"),
+        "[progress.percentage]{task.percentage:>3.1f}%",
+        "•",
+        DownloadColumn(),
+        "•",
+        TransferSpeedColumn(),
+        "•",
+        TimeRemainingColumn(),
         console=console,
     ) as progress:
         for season, chapter in chapters:
