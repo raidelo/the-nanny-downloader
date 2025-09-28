@@ -2,7 +2,7 @@ import json
 from base64 import b64decode
 from pathlib import Path
 
-from requests import get
+from requests import get, head
 from bs4 import BeautifulSoup
 
 from constants import TRID_MAPPING_PATH, DEFAULT_USER_AGENT, TEMPLATE_URL
@@ -78,6 +78,10 @@ def download_archive(url, path: Path | None = None, resume: bool = True):
     if resume and path.exists():
         written = path.stat().st_size
         if written != 0:
+            r = head(url)
+            content_type = r.headers.get("Content-Length")
+            if content_type and written == int(content_type):
+                return written
             open_mode = "ab"
             headers = {"Range": f"bytes={written}-"}
 
