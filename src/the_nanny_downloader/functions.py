@@ -10,14 +10,14 @@ from requests import Response, get, head
 from rich.console import Console
 from rich.progress import Progress
 
-from console import console
-from constants import (
+from the_nanny_downloader.console import console
+from the_nanny_downloader.constants import (
     DEFAULT_DOWNLOAD_FILENAME,
     DEFAULT_USER_AGENT,
     TEMPLATE_URL,
     TRID_MAPPING_PATH,
 )
-from errors import InvalidChapter, InvalidDeliveryMethod
+from the_nanny_downloader.errors import InvalidChapter, InvalidDeliveryMethod
 
 
 def load_trid_mapping() -> Mapping[str, str]:
