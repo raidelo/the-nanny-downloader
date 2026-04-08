@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 
 
 def argument_parser() -> ArgumentParser:
@@ -9,3 +9,7 @@ def argument_parser() -> ArgumentParser:
     parser.add_argument("-f", "--folder", dest="folder")
 
     return parser
+
+
+def parse_args() -> Namespace:
+    return argument_parser().parse_args()

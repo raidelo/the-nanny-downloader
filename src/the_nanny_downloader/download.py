@@ -1,79 +1,31 @@
-import json
-from base64 import b64decode
+from argparse import Namespace
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator, Mapping, Optional
+from typing import Generator
 from urllib.parse import unquote_plus
 
-from bs4 import BeautifulSoup, Tag
-from requests import Response, get, head
+from requests import RequestException, get, head
 from rich.console import Console
-from rich.progress import Progress
+from rich.progress import (
+    BarColumn,
+    DownloadColumn,
+    Progress,
+    TextColumn,
+    TimeRemainingColumn,
+    TransferSpeedColumn,
+)
 
 from the_nanny_downloader.console import console
 from the_nanny_downloader.constants import (
     DEFAULT_DOWNLOAD_FILENAME,
-    DEFAULT_USER_AGENT,
-    TEMPLATE_URL,
-    TRID_MAPPING_PATH,
+    TRDOWNLOAD_MAPPING,
 )
-from the_nanny_downloader.errors import InvalidChapter, InvalidDeliveryMethod
-
-
-def load_trid_mapping() -> Mapping[str, str]:
-    with open(TRID_MAPPING_PATH, "rb") as jsonfile:
-        return json.load(jsonfile)
-
-
-def get_delivery_page(url: str, user_agent: str = DEFAULT_USER_AGENT) -> Response:
-    return get(url, headers={"User-Agent": user_agent})
-
-
-def get_final_url_from_mediafire(page: bytes) -> Optional[str]:
-    soup = BeautifulSoup(page, "html.parser")
-    a_tag = soup.find("a", {"id": "downloadButton"})
-
-    if not isinstance(a_tag, Tag):
-        return
-
-    base64_encoded_url = a_tag.attrs.get("data-scrambled-url")
-
-    if base64_encoded_url and isinstance(base64_encoded_url, str):
-        return b64decode(base64_encoded_url).decode()
-    else:
-        url = a_tag.attrs.get("href")
-        if url and isinstance(url, str):
-            return url
-        else:
-            return
-
-
-def get_first_url(
-    chapter: str,
-    delivery_method: str,
-    trid_mapping: Mapping[str, str],
-    trdownload_map: Mapping[str, int],
-) -> str:
-    try:
-        trdownload = trdownload_map[delivery_method]
-    except KeyError:
-        raise InvalidDeliveryMethod(delivery_method)
-    try:
-        trid = trid_mapping[chapter]
-    except KeyError:
-        raise InvalidChapter(chapter)
-
-    return TEMPLATE_URL % {"trdownload": trdownload, "trid": trid}
-
-
-def get_final_url(first_url: str, delivery_method: str) -> Optional[str]:
-    delivery_resp = get_delivery_page(first_url)
-    delivery_content = delivery_resp.content
-
-    if delivery_method == "mediafire":
-        return get_final_url_from_mediafire(delivery_content)
-    else:
-        raise NotImplementedError()
+from the_nanny_downloader.errors import (
+    ChapterNotFound,
+    DeliveryMethodNotFound,
+)
+from the_nanny_downloader.types_ import ChapterInfo
+from the_nanny_downloader.utils import create_first_url, get_final_url, print_error
 
 
 @dataclass
@@ -84,7 +36,7 @@ class DownloadStatus:
 
 def download_archive(
     url: str,
-    path: Optional[Path] = None,
+    path: Path | None = None,
     resume: bool = True,
 ) -> Generator[DownloadStatus, None, None]:
     """
@@ -151,7 +103,7 @@ def download_from_final_url(
     console: Console,
     progress: Progress,
     final_url: str,
-    folder_path: Optional[Path],
+    folder_path: Path | None,
     season: int,
 ) -> None:
     filename = unquote_plus(Path(final_url.split("?")[0]).name)
@@ -186,5 +138,64 @@ def download_from_final_url(
     progress.remove_task(task)
 
 
-def print_error(string: str, default_msg_color: str = "white") -> None:
-    console.print(f"[red bold]error:[/] [{default_msg_color}]{string}[/]\n")
+def download_chapters(
+    chapters: list[ChapterInfo],
+    trid_mapping: dict[str, int],
+    args: Namespace,
+) -> int:
+    with Progress(
+        TextColumn("[bold blue]Downloading"),
+        BarColumn(bar_width=None),
+        "[progress.percentage]{task.percentage:>3.1f}%",
+        "•",
+        DownloadColumn(),
+        "•",
+        TransferSpeedColumn(),
+        "•",
+        TimeRemainingColumn(),
+        console=console,
+    ) as progress:
+        for season, chapter in chapters:
+            try:
+                first_url = create_first_url(
+                    f"{season}x{chapter}",
+                    args.delivery,
+                    trid_mapping,
+                    TRDOWNLOAD_MAPPING,
+                )
+            except ChapterNotFound as e:
+                print_error(f"Invalid chapter [bold]{e.chapter}")
+                continue
+            except DeliveryMethodNotFound as e:
+                print_error(f"Invalid delivery method [bold]{e.delivery_method}")
+                continue
+
+            final_url = get_final_url(first_url, args.delivery)
+
+            if not final_url:
+                print_error(
+                    f"Can't download chapter [bold]{chapter}[/bold]. It's url wasn't found."
+                )
+                continue
+
+            try:
+                download_from_final_url(
+                    console,
+                    progress,
+                    final_url,
+                    args.folder,
+                    season,
+                )
+            except RequestException:
+                print_error(
+                    f"An unexpected error occurred while downloading: [bold]{season}x{chapter}[/bold]"
+                )
+                return 1
+
+            console.print(
+                f"[bold green] Capítulo [bold]{season}x{chapter}[/bold] descargado con éxito[/]\n"
+            )
+
+        console.print("[bold green]✅ Descarga finalizada con éxito[/bold green]\n")
+
+        return 0
