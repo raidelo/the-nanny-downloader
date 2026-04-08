@@ -12,7 +12,7 @@ from the_nanny_downloader.cli import argument_parser
 from the_nanny_downloader.console import console
 from the_nanny_downloader.constants import CHAPTER_MATCH, TRDOWNLOAD_MAPPING
 from the_nanny_downloader.errors import InvalidChapter, InvalidDeliveryMethod
-from the_nanny_downloader.functions import (
+from the_nanny_downloader.utils import (
     download_from_final_url,
     get_final_url,
     get_first_url,
