@@ -91,7 +91,7 @@ def download_archive(
         get(url=url, stream=True, headers=headers) as resp,
     ):
         resp.raise_for_status()
-        total_size = int(resp.headers.get("Content-Length") or 0)
+        total_size = int(resp.headers.get("Content-Length") or 0) + local_size
         for data in resp.iter_content(chunk_size=chunk_size):
             if data:
                 f.write(data)
